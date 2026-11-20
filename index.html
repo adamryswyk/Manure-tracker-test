@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#173d2b">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>Manure Hauling Tracker</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{--green:#173d2b;--green2:#236342;--bg:#f3f6f3;--card:#fff;--ink:#17231c;--muted:#65736a;--line:#dce5de;--blue:#245b91;--red:#a83232}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:var(--green);color:white;padding:18px max(16px,env(safe-area-inset-left));padding-top:calc(16px + env(safe-area-inset-top));position:sticky;top:0;z-index:5}
+.head{max-width:1100px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}h1{font-size:21px;margin:0}header p{margin:4px 0 0;color:#d5e5d9;font-size:12px}
+nav{display:flex;gap:7px;max-width:1100px;margin:14px auto 0;overflow:auto}nav button{white-space:nowrap;background:#315b43;color:#fff;border:1px solid #64836d;border-radius:10px;padding:10px 13px;font-weight:650}
+nav button.active{background:white;color:var(--green)}
+main{max-width:1100px;margin:18px auto;padding:0 14px 40px}.view{display:none}.view.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stats{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:16px;min-height:95px}.stats .k{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}.stats .v{font-size:clamp(23px,4vw,32px);font-weight:800;margin-top:7px;font-variant-numeric:tabular-nums}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px;margin-top:14px}.panel h2{font-size:18px;margin:0 0 14px}.sub{color:var(--muted);font-size:13px}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#435148}
+select,input{width:100%;padding:13px;border:1px solid #cbd8ce;border-radius:10px;background:#fff;color:var(--ink);font-size:16px;min-height:48px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.big{border:0;border-radius:14px;color:white;padding:20px 12px;min-height:110px;font-weight:800;font-size:19px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 0 #0001}
+.big small{font-size:13px;font-weight:600;opacity:.9}.truck{background:#245b91}.tractor{background:#236342}.big:active{transform:translateY(1px)}
+button{cursor:pointer}.btn{border:1px solid #cbd8ce;background:#fff;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:700;color:var(--ink)}.primary{background:var(--green2);border-color:var(--green2);color:white}.danger{color:var(--red);border-color:#e5bcbc}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}td.num{text-align:right;font-variant-numeric:tabular-nums} .tablewrap{overflow:auto}
+.pill{display:inline-block;border-radius:99px;padding:4px 8px;font-size:11px;font-weight:800;background:#eaf1ec;color:var(--green)}
+.manage{display:grid;grid-template-columns:1fr 1fr;gap:14px}.manage .panel{margin-top:0}.item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}
+.item button{padding:7px 9px;font-size:12px}.empty{text-align:center;color:var(--muted);padding:22px}
+.notice{background:#fff8df;border:1px solid #eadb9b;border-radius:12px;padding:12px;font-size:13px;color:#5d4b16;margin-top:12px}
+footer{color:var(--muted);font-size:12px;text-align:center;margin:20px 0}
+@media(max-width:700px){.grid{grid-template-columns:1fr 1fr}.manage{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.stats{padding:13px}.actions{gap:9px}.big{font-size:17px;min-height:104px}main{padding-left:11px;padding-right:11px}nav{padding:0 12px}}
+@media(min-width:701px){header{padding-left:20px;padding-right:20px}}
+
+.timer-overlay{position:fixed;inset:0;background:#000b;z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.timer-box{background:white;border-radius:22px;padding:28px;text-align:center;width:min(95vw,480px);box-shadow:0 15px 50px #0005}
+.timer-clock{font-size:clamp(76px,16vw,125px);font-weight:900;font-variant-numeric:tabular-nums;line-height:1.25}
+</style>
+</head>
+<body>
+<header>
+ <div class="head"><div><h1>🚜 Manure Hauling Tracker</h1><p>Loading station · Load log & reports</p></div><span class="pill" style="background:#d9eadf;color:#173d2b">iPad station</span></div>
+ <nav>
+  <button class="active" data-tab="dashboard">Load Entry</button>
+  <button data-tab="history">Load History</button>
+  <button data-tab="reports">Reports & Export</button>
+  <button data-tab="settings">Edit Barns & Fields</button>
+ </nav>
+</header>
+<main>
+<section id="dashboard" class="view active">
+ <div class="grid">
+  <div class="stats"><div class="k">All-time loads</div><div class="v" id="allLoads">0</div></div>
+  <div class="stats"><div class="k">All-time gallons</div><div class="v" id="allGallons">0</div></div>
+  <div class="stats"><div class="k">Today's loads</div><div class="v" id="todayLoads">0</div></div>
+  <div class="stats"><div class="k">Today's gallons</div><div class="v" id="todayGallons">0</div></div>
+ </div>
+ <div class="panel">
+  <h2>Start a new load</h2>
+  <div class="actions">
+   <div class="panel"><button class="big truck" onclick="addLoad('Truck',7000)"><svg width="100" height="47" viewBox="0 0 150 65" aria-label="White semi with silver tanker"><rect x="7" y="14" width="89" height="30" rx="15" fill="#c0c8cc" stroke="#697780" stroke-width="2"/><path d="M100 24h27l13 12v15h-42V24" fill="#fff" stroke="#64717a" stroke-width="2"/><path d="M120 27h7l9 9h-16z" fill="#9dc6d6"/><circle cx="33" cy="52" r="9" fill="#263238"/><circle cx="33" cy="52" r="4" fill="#aeb8be"/><circle cx="82" cy="52" r="9" fill="#263238"/><circle cx="82" cy="52" r="4" fill="#aeb8be"/><circle cx="122" cy="52" r="9" fill="#263238"/><circle cx="122" cy="52" r="4" fill="#aeb8be"/></svg> 7,000-Gallon Truck<small>Tap when filling starts</small></button>
+    <label>Truck barn</label><select id="truckBarn"></select><label>Truck destination field</label><select id="truckField"></select></div>
+   <div class="panel"><button class="big tractor" onclick="addLoad('Tractor',9500)"><svg width="95" height="55" viewBox="0 0 130 75" aria-label="Red tractor"><path d="M26 31h55l14 13h18v13H18V44z" fill="#c52327" stroke="#8b1116" stroke-width="3"/><path d="M47 31V10h34l14 34H47" fill="#c52327" stroke="#8b1116" stroke-width="3"/><path d="M53 15h23l10 24H53z" fill="#b7d6e2"/><circle cx="42" cy="57" r="17" fill="#242424"/><circle cx="42" cy="57" r="8" fill="#bfc5c8"/><circle cx="103" cy="59" r="11" fill="#242424"/><circle cx="103" cy="59" r="5" fill="#bfc5c8"/></svg> 9,500-Gallon Tractor<small>Tap when filling starts</small></button>
+    <label>Tractor barn</label><select id="tractorBarn"></select><label>Tractor destination field</label><select id="tractorField"></select></div>
+  </div>
+  <div class="row"><button class="btn primary" onclick="openManual()">+ Enter a past load manually</button></div>
+  <div class="notice" id="setupNotice">Choose a barn and a field before recording a load. Use “Edit Barns & Fields” to set up your lists.</div>
+ </div>
+ <div class="panel">
+  <div class="row between"><h2 style="margin:0">Today's recent loads</h2><button class="btn" onclick="showTab('history')">View full history</button></div>
+  <div class="tablewrap"><table><thead><tr><th>Load #</th><th>Start time</th><th>Equipment</th><th>Barn</th><th>Field</th><th class="num">Gallons</th></tr></thead><tbody id="recentRows"></tbody></table></div>
+ </div>
+</section>
+<section id="history" class="view">
+ <div class="panel">
+  <div class="row between"><div><h2 style="margin:0">Complete load history</h2><div class="sub" id="historyCount">0 records</div></div><button class="btn" onclick="exportWorkbook()">Export all to Excel</button></div>
+  <div class="tablewrap"><table><thead><tr><th>Load #</th><th>Date</th><th>Start time</th><th>Equipment</th><th>Barn</th><th>Field</th><th class="num">Gallons</th><th></th></tr></thead><tbody id="historyRows"></tbody></table></div>
+ </div>
+ <div class="panel" id="loadEditor" style="display:none"><h2 id="editorTitle">Enter load</h2>
+  <div class="formgrid">
+   <div><label>Equipment</label><select id="editEquip"><option value="Truck">7,000-gallon truck</option><option value="Tractor">9,500-gallon tractor</option></select></div>
+   <div><label>Barn</label><select id="editBarn"></select></div>
+   <div><label>Field</label><select id="editField"></select></div>
+   <div><label>Actual date and start time</label><input type="datetime-local" id="editWhen"></div>
+  </div>
+  <div class="row" style="margin-top:12px"><button class="btn primary" onclick="saveEditor()">Save load</button><button class="btn" onclick="closeEditor()">Cancel</button></div>
+ </div>
+</section>
+<section id="reports" class="view">
+ <div class="panel">
+  <h2>Build a report</h2>
+  <div class="formgrid">
+   <div><label for="fromDate">From date</label><input type="date" id="fromDate"></div>
+   <div><label for="toDate">To date</label><input type="date" id="toDate"></div>
+   <div><label for="reportBarn">Barn</label><select id="reportBarn"><option value="">All barns</option></select></div>
+   <div><label for="reportField">Field</label><select id="reportField"><option value="">All fields</option></select></div>
+   <div><label for="reportEquip">Equipment</label><select id="reportEquip"><option value="">All equipment</option><option>Truck</option><option>Tractor</option></select></div>
+  </div>
+  <div class="row" style="margin-top:13px"><button class="btn primary" onclick="renderReport()">Run report</button><button class="btn" onclick="clearReport()">Clear filters</button><button class="btn" onclick="exportReport()">Export this report</button><button class="btn" onclick="exportWorkbook()">Export everything to Excel</button></div>
+ </div>
+ <div class="grid" style="margin-top:14px">
+  <div class="stats"><div class="k">Report loads</div><div class="v" id="reportLoads">0</div></div>
+  <div class="stats"><div class="k">Report gallons</div><div class="v" id="reportGallons">0</div></div>
+  <div class="stats"><div class="k">Truck loads</div><div class="v" id="reportTrucks">0</div></div>
+  <div class="stats"><div class="k">Tractor loads</div><div class="v" id="reportTractors">0</div></div>
+ </div>
+ <div class="panel"><h2>Report load detail</h2><div class="tablewrap"><table><thead><tr><th>Load #</th><th>Date</th><th>Time</th><th>Equipment</th><th>Barn</th><th>Field</th><th class="num">Gallons</th></tr></thead><tbody id="reportRows"></tbody></table></div></div>
+</section>
+<section id="settings" class="view">
+ <div class="panel"><h2>Manage dropdown lists</h2><p class="sub">Add, rename, or remove names whenever needed. Existing load records keep the barn and field names that were selected when the load was recorded.</p></div>
+ <div class="manage">
+  <div class="panel"><h2>Barns</h2><div class="row"><input id="newBarn" placeholder="Enter barn name" aria-label="New barn name"><button class="btn primary" onclick="addName('barn')">Add</button></div><div id="barnList"></div></div>
+  <div class="panel"><h2>Fields</h2><div class="row"><input id="newField" placeholder="Enter field name" aria-label="New field name"><button class="btn primary" onclick="addName('field')">Add</button></div><div id="fieldList"></div></div>
+ </div>
+ <div class="panel"><h2>Loading countdown settings</h2><p class="sub">The countdown is only a visual reminder. Loads are recorded immediately when you tap a load button.</p><div class="formgrid"><div><label for="truckMinutes">Truck countdown (minutes)</label><input id="truckMinutes" type="number" min="1" max="120" step="1" value="5"></div><div><label for="tractorMinutes">Tractor countdown (minutes)</label><input id="tractorMinutes" type="number" min="1" max="120" step="1" value="7"></div></div></div><div class="panel"><h2>Data & backup</h2><p class="sub">Your records are saved in this iPad's browser. Export the Excel workbook regularly as a backup.</p><div class="row"><button class="btn primary" onclick="exportWorkbook()">Export complete Excel workbook</button><button class="btn" onclick="downloadBackup()">Download data backup</button><button class="btn" onclick="document.getElementById('restoreFile').click()">Restore data backup</button><input id="restoreFile" type="file" accept=".json,application/json" style="display:none" onchange="restoreBackup(event)"></div><div class="notice">Use this app on the same iPad and browser where loads are recorded. Clearing Safari website data or resetting the iPad can erase locally stored records.</div></div>
+</section>
+<footer>Manure Hauling Tracker · Records are stored on this iPad</footer>
+</main>
+<div id="timerOverlay" class="timer-overlay" role="dialog" aria-modal="true" aria-label="Load time"><div class="timer-box"><h2>Load time</h2><div id="timerClock" class="timer-clock">07:00</div><button class="btn primary" onclick="finishTimer()">Finish Early</button></div></div>
+<script>
+const KEY='manureHaulingTracker_v1';
+const starter={barns:['North Barn','South Barn','West Barn'],fields:['Field 1','Field 2','Field 3','Field 4'],loads:[]};
+let db=loadDB();
+function loadDB(){try{const x=JSON.parse(localStorage.getItem(KEY));if(x&&Array.isArray(x.barns)&&Array.isArray(x.fields)&&Array.isArray(x.loads))return x;}catch(e){}return structuredClone(starter)}
+function save(){localStorage.setItem(KEY,JSON.stringify(db));renderAll();renderReport()}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmt(n){return Number(n||0).toLocaleString('en-US')}
+function dateKey(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+const SELECTION_KEY='manureHaulingTracker_equipmentSelections_v1';
+const loadSelectionIds=['truckBarn','truckField','tractorBarn','tractorField'];
+function rememberSelections(){try{const values={};loadSelectionIds.forEach(id=>values[id]=document.getElementById(id).value);localStorage.setItem(SELECTION_KEY,JSON.stringify(values))}catch(e){console.warn('Unable to remember selections',e)}}
+function restoreSelections(){try{const values=JSON.parse(localStorage.getItem(SELECTION_KEY)||'{}');loadSelectionIds.forEach(id=>{const el=document.getElementById(id);if(typeof values[id]==='string'&&Array.from(el.options).some(o=>o.value===values[id]))el.value=values[id]})}catch(e){console.warn('Unable to restore selections',e)}}
+function selected(id){return document.getElementById(id).value}
+function fillSelect(id,items,first){const el=document.getElementById(id),old=el.value;el.innerHTML='<option value="">'+first+'</option>'+items.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');if(items.includes(old))el.value=old}
+function addLoad(type,gallons){
+ const barn=selected(type==='Truck'?'truckBarn':'tractorBarn'),field=selected(type==='Truck'?'truckField':'tractorField');
+ if(!barn||!field){alert('Please choose both a barn and a field before recording the load.');return}
+ const now=new Date();
+ const load={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),number:db.loads.length?Math.max(...db.loads.map(x=>x.number))+1:1,date:dateKey(now),time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}),timestamp:now.getTime(),equipment:type,barn,field,gallons};
+ if(!confirm('Record '+type+' load ('+fmt(gallons)+' gallons)?\\nBarn: '+barn+'\\nField: '+field+'\\nStart time: '+load.time))return;
+ db.loads.push(load);save();startTimer(type);document.getElementById('setupNotice').textContent='Load #'+load.number+' recorded at '+load.time+'. Ready for the next load.';
+}
+function showTab(id){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));if(id==='reports')renderReport();window.scrollTo({top:0,behavior:'smooth'})}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+function rowsHTML(loads,withAction){if(!loads.length)return '<tr><td colspan="'+(withAction?8:7)+'" class="empty">No loads recorded yet.</td></tr>';return [...loads].sort((a,b)=>b.timestamp-a.timestamp).map(x=>'<tr><td>#'+x.number+'</td><td>'+esc(x.date)+'</td><td>'+esc(x.time)+'</td><td><span class="pill">'+esc(x.equipment)+'</span></td><td>'+esc(x.barn)+'</td><td>'+esc(x.field)+'</td><td class="num">'+fmt(x.gallons)+'</td>'+(withAction?'<td><button class="btn" onclick="openEdit('+x.number+')">Edit</button> <button class="btn danger" onclick="deleteLoad('+x.number+')">Delete</button></td>':'')+'</tr>').join('')}
+function renderAll(){
+ const today=dateKey(new Date()),loads=db.loads,total=db.loads.reduce((s,x)=>s+x.gallons,0),tod=loads.filter(x=>x.date===today);
+ document.getElementById('allLoads').textContent=fmt(loads.length);document.getElementById('allGallons').textContent=fmt(total);document.getElementById('todayLoads').textContent=fmt(tod.length);document.getElementById('todayGallons').textContent=fmt(tod.reduce((s,x)=>s+x.gallons,0));
+ document.getElementById('recentRows').innerHTML=rowsHTML(tod,false);document.getElementById('historyRows').innerHTML=rowsHTML(loads,true);document.getElementById('historyCount').textContent=loads.length+' records';
+ ['truckBarn','tractorBarn','editBarn'].forEach(id=>fillSelect(id,db.barns,'Choose a barn…'));['truckField','tractorField','editField'].forEach(id=>fillSelect(id,db.fields,'Choose a field…'));fillSelect('reportBarn',db.barns,'All barns');fillSelect('reportField',db.fields,'All fields');
+ restoreSelections();
+ document.getElementById('barnList').innerHTML=nameList('barn',db.barns);document.getElementById('fieldList').innerHTML=nameList('field',db.fields);
+}
+function nameList(kind,items){return items.length?items.map((n,i)=>`<div class="item"><span>${esc(n)}</span><span class="row"><button class="btn" onclick="renameName('${kind}',${i})">Rename</button><button class="btn danger" onclick="removeName('${kind}',${i})">Remove</button></span></div>`).join(''):'<div class="empty">No names added yet.</div>'}
+function addName(kind){const id=kind==='barn'?'newBarn':'newField',val=document.getElementById(id).value.trim(),arr=kind==='barn'?db.barns:db.fields;if(!val)return;if(arr.some(x=>x.toLowerCase()===val.toLowerCase())){alert('That name is already on the list.');return}arr.push(val);document.getElementById(id).value='';save()}
+function renameName(kind,i){const arr=kind==='barn'?db.barns:db.fields,old=arr[i],val=prompt('Rename "'+old+'" to:',old);if(val===null)return;const n=val.trim();if(!n)return;if(arr.some((x,j)=>j!==i&&x.toLowerCase()===n.toLowerCase())){alert('That name is already on the list.');return}arr[i]=n;save()}
+function removeName(kind,i){const arr=kind==='barn'?db.barns:db.fields;if(!confirm('Remove "'+arr[i]+'" from the dropdown list? Past load records will not change.'))return;arr.splice(i,1);save()}
+let editingNumber=null;
+function localInput(d){return dateKey(d)+'T'+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function openManual(){editingNumber=null;showTab('history');document.getElementById('editorTitle').textContent='Enter a past load';document.getElementById('editEquip').value='Truck';document.getElementById('editBarn').value='';document.getElementById('editField').value='';document.getElementById('editWhen').value=localInput(new Date());document.getElementById('loadEditor').style.display='block';document.getElementById('loadEditor').scrollIntoView()}
+function openEdit(num){const x=db.loads.find(y=>y.number===num);if(!x)return;editingNumber=num;showTab('history');document.getElementById('editorTitle').textContent='Edit load #'+num;document.getElementById('editEquip').value=x.equipment;fillSelect('editBarn',[...new Set([...db.barns,x.barn])],'Choose a barn…');fillSelect('editField',[...new Set([...db.fields,x.field])],'Choose a field…');document.getElementById('editBarn').value=x.barn;document.getElementById('editField').value=x.field;document.getElementById('editWhen').value=localInput(new Date(x.timestamp));document.getElementById('loadEditor').style.display='block';document.getElementById('loadEditor').scrollIntoView()}
+function closeEditor(){document.getElementById('loadEditor').style.display='none';editingNumber=null}
+function saveEditor(){const equip=selected('editEquip'),barn=selected('editBarn'),field=selected('editField'),when=selected('editWhen');const d=new Date(when);if(!barn||!field||!when||isNaN(d.getTime())){alert('Select equipment, barn, field, and a valid date and time.');return}const x=editingNumber===null?{number:db.loads.reduce((m,y)=>Math.max(m,y.number),0)+1,id:crypto.randomUUID?crypto.randomUUID():String(Date.now())}:db.loads.find(y=>y.number===editingNumber);if(!x)return;Object.assign(x,{equipment:equip,barn,field,gallons:equip==='Truck'?7000:9500,timestamp:d.getTime(),date:dateKey(d),time:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}),updatedAt:Date.now()});if(editingNumber===null)db.loads.push(x);closeEditor();save();alert('Load saved. Totals and reports updated.')}
+function deleteLoad(num){if(!confirm('Delete load #'+num+'?'))return;localStorage.setItem(KEY+'_before_delete',JSON.stringify(db));db.loads=db.loads.filter(x=>x.number!==num);save()}
+function filtered(){const from=selected('fromDate'),to=selected('toDate'),barn=selected('reportBarn'),field=selected('reportField'),eq=selected('reportEquip');return db.loads.filter(x=>(!from||x.date>=from)&&(!to||x.date<=to)&&(!barn||x.barn===barn)&&(!field||x.field===field)&&(!eq||x.equipment===eq))}
+function renderReport(){const a=filtered();document.getElementById('reportLoads').textContent=fmt(a.length);document.getElementById('reportGallons').textContent=fmt(a.reduce((s,x)=>s+x.gallons,0));document.getElementById('reportTrucks').textContent=fmt(a.filter(x=>x.equipment==='Truck').length);document.getElementById('reportTractors').textContent=fmt(a.filter(x=>x.equipment==='Tractor').length);document.getElementById('reportRows').innerHTML=rowsHTML(a,false)}
+function clearReport(){['fromDate','toDate','reportBarn','reportField','reportEquip'].forEach(id=>document.getElementById(id).value='');renderReport()}
+function exportRows(loads){return loads.map(x=>({'Load #':x.number,'Date':x.date,'Start Time':x.time,'Equipment':x.equipment,'Barn':x.barn,'Destination Field':x.field,'Gallons':x.gallons}))}
+function saveBlob(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function exportWorkbook(){
+ const data=exportRows(db.loads);
+ if(window.XLSX){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data.length?data:[{'Load #':'No loads recorded'}]),'Load History');
+ const summary=[{Metric:'Total loads',Value:db.loads.length},{Metric:'Total gallons',Value:db.loads.reduce((s,x)=>s+x.gallons,0)},{Metric:'7,000-gallon truck loads',Value:db.loads.filter(x=>x.equipment==='Truck').length},{Metric:'9,500-gallon tractor loads',Value:db.loads.filter(x=>x.equipment==='Tractor').length}];XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(summary),'Summary');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Barn names'],...db.barns.map(x=>[x])]),'Barns');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Field names'],...db.fields.map(x=>[x])]),'Fields');XLSX.writeFile(wb,'Manure_Hauling_Tracker.xlsx');
+ }else{const csv=[Object.keys(data[0]||{'Load #':'','Date':'','Start Time':'','Equipment':'','Barn':'','Destination Field':'','Gallons':''}).join(','),...data.map(o=>Object.values(o).map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(','))].join('\\r\\n');saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),'Manure_Hauling_Loads.csv');alert('Excel export library was unavailable, so a CSV file was exported. It opens in Excel.')}
+}
+function exportReport(){const data=exportRows(filtered());if(window.XLSX){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data.length?data:[{'Load #':'No matching loads'}]),'Filtered Report');XLSX.writeFile(wb,'Manure_Hauling_Report.xlsx')}else{const csv=[Object.keys(data[0]||{'Load #':'','Date':'','Start Time':'','Equipment':'','Barn':'','Destination Field':'','Gallons':''}).join(','),...data.map(o=>Object.values(o).map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(','))].join('\\r\\n');saveBlob(new Blob([csv],{type:'text/csv'}),'Manure_Hauling_Report.csv')}}
+async function restoreBackup(event){
+ const file=event.target.files&&event.target.files[0];if(!file)return;
+ try{
+  const candidate=JSON.parse(await file.text());
+  if(!candidate||!Array.isArray(candidate.barns)||!Array.isArray(candidate.fields)||!Array.isArray(candidate.loads))throw Error('Invalid backup format');
+  if(!candidate.barns.every(x=>typeof x==='string')||!candidate.fields.every(x=>typeof x==='string')||!candidate.loads.every(x=>x&&Number.isFinite(x.timestamp)&&Number.isFinite(x.gallons)&&typeof x.barn==='string'&&typeof x.field==='string'&&typeof x.equipment==='string'&&Number.isInteger(x.number)))throw Error('Backup contains invalid records');
+  if(!confirm('Restore '+candidate.loads.length+' loads from this backup? This replaces the current records on this device. Download a current backup first if you need to keep them.'))return;
+  const safety=JSON.stringify(db);
+  localStorage.setItem(KEY+'_before_restore',safety);
+  localStorage.setItem(KEY,JSON.stringify(candidate));
+  db=candidate;closeEditor();renderAll();renderReport();
+  alert('Backup restored. A copy of the previous records was saved on this device.');
+ }catch(e){alert('Backup not restored: '+e.message)}
+ finally{event.target.value=''}
+}
+function downloadBackup(){saveBlob(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),'Manure_Hauling_Backup.json')}
+
+// Loading timer: load records are saved immediately; countdown is visual only.
+const TIMER_SETTINGS_KEY='manureHaulingTracker_timerSettings_v1';
+let timerInterval=null, timerEnd=0;
+function timerSettings(){
+ try{const x=JSON.parse(localStorage.getItem(TIMER_SETTINGS_KEY)||'{}');return {Tractor:validMinutes(x.Tractor,7),Truck:validMinutes(x.Truck,5)}}
+ catch(e){return {Tractor:7,Truck:5}}
+}
+function validMinutes(n,fallback){const v=Number(n);return Number.isFinite(v)&&v>=1&&v<=120?v:fallback}
+function startTimer(type){
+ finishTimer();
+ const mins=timerSettings()[type]||5;
+ timerEnd=Date.now()+mins*60000;
+ document.getElementById('timerOverlay').style.display='flex';
+ updateTimerClock();
+ timerInterval=setInterval(updateTimerClock,250);
+}
+function updateTimerClock(){
+ const remaining=Math.max(0,Math.ceil((timerEnd-Date.now())/1000));
+ const m=Math.floor(remaining/60),sec=remaining%60;
+ document.getElementById('timerClock').textContent=String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+ if(remaining===0)finishTimer();
+}
+function finishTimer(){
+ if(timerInterval!==null){clearInterval(timerInterval);timerInterval=null}
+ document.getElementById('timerOverlay').style.display='none';
+}
+function initializeTimerSettings(){
+ const values=timerSettings();
+ const tractor=document.getElementById('tractorMinutes'),truck=document.getElementById('truckMinutes');
+ tractor.value=values.Tractor;truck.value=values.Truck;
+ [tractor,truck].forEach(el=>el.addEventListener('change',()=>{
+   const old=timerSettings(),type=el===tractor?'Tractor':'Truck';
+   const v=validMinutes(el.value,old[type]);el.value=v;old[type]=v;
+   localStorage.setItem(TIMER_SETTINGS_KEY,JSON.stringify(old));
+ }));
+}
+initializeTimerSettings();
+
+renderAll();renderReport();
+loadSelectionIds.forEach(id=>document.getElementById(id).addEventListener('change',rememberSelections));
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('Offline support unavailable',e)))}
+</script>
+</body></html>
